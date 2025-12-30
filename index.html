@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SBI Forex Card Rates - Daily Updates</title>
+    <title>SBI Forex Card Rates - Daily Download</title>
     <style>
         * {
             margin: 0;
@@ -38,6 +38,55 @@
             font-size: 1.1em;
             opacity: 0.9;
         }
+        .search-container {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .search-box {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .search-input {
+            width: 100%;
+            padding: 15px 50px 15px 20px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 50px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .search-input:focus {
+            border-color: #00447c;
+        }
+        .search-icon {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 20px;
+        }
+        .clear-search {
+            position: absolute;
+            right: 50px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            display: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .clear-search:hover {
+            background: #cc0000;
+        }
         .info-box {
             background: #e3f2fd;
             padding: 20px;
@@ -47,6 +96,29 @@
         }
         .content {
             padding: 30px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin: 10px;
+            min-width: 150px;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00447c;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
         }
         .file-list {
             margin-top: 30px;
@@ -66,6 +138,9 @@
             transform: translateY(-3px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             border-color: #00447c;
+        }
+        .file-item.hidden {
+            display: none;
         }
         .file-info {
             flex-grow: 1;
@@ -106,6 +181,15 @@
             padding: 40px;
             color: #666;
         }
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            display: none;
+        }
+        .no-results.show {
+            display: block;
+        }
         .footer {
             text-align: center;
             padding: 30px;
@@ -113,28 +197,18 @@
             color: #666;
             border-top: 1px solid #e0e0e0;
         }
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            margin: 30px 0;
-            flex-wrap: wrap;
-        }
-        .stat-box {
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin: 10px;
-            min-width: 150px;
-        }
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #00447c;
-        }
-        .stat-label {
-            color: #666;
-            margin-top: 5px;
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .file-item {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .download-btn {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -143,6 +217,20 @@
         <div class="header">
             <h1>📊 SBI Forex Card Rates</h1>
             <p>Daily automated updates from SBI official source</p>
+        </div>
+
+        <div class="search-container">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="search-input" 
+                    placeholder="🔍 Search by date (e.g., 2024-12-30, December, 2024)..."
+                    autocomplete="off"
+                >
+                <button id="clearSearch" class="clear-search">✕</button>
+                <span class="search-icon">🔍</span>
+            </div>
         </div>
 
         <div class="content">
@@ -157,6 +245,10 @@
                     <div class="stat-label">Total Files</div>
                 </div>
                 <div class="stat-box">
+                    <div class="stat-number" id="visibleFiles">-</div>
+                    <div class="stat-label">Showing</div>
+                </div>
+                <div class="stat-box">
                     <div class="stat-number" id="lastUpdate">-</div>
                     <div class="stat-label">Last Updated</div>
                 </div>
@@ -165,6 +257,10 @@
             <h2>📥 Available Downloads</h2>
             <div id="fileList" class="file-list">
                 <div class="loading">Loading files...</div>
+            </div>
+            <div id="noResults" class="no-results">
+                <h3>😕 No files found</h3>
+                <p>Try a different search term or clear the search</p>
             </div>
         </div>
 
@@ -181,6 +277,9 @@
     <script>
         const GITHUB_API = 'https://api.github.com/repos/iamlearninggpt/forex-card-downloader/contents/forex_rates';
         const RAW_BASE = 'https://github.com/iamlearninggpt/forex-card-downloader/raw/main/forex_rates';
+        
+        let allFiles = [];
+        let fileElements = [];
 
         async function loadFiles() {
             try {
@@ -188,48 +287,57 @@
                 const files = await response.json();
                 
                 // Filter only PDF files and sort by date (newest first)
-                const pdfFiles = files
+                allFiles = files
                     .filter(file => file.name.endsWith('.pdf'))
                     .sort((a, b) => b.name.localeCompare(a.name));
 
-                if (pdfFiles.length === 0) {
+                if (allFiles.length === 0) {
                     document.getElementById('fileList').innerHTML = '<p class="loading">No files available yet.</p>';
                     return;
                 }
 
                 // Update stats
-                document.getElementById('totalFiles').textContent = pdfFiles.length;
-                const latestDate = extractDate(pdfFiles[0].name);
+                document.getElementById('totalFiles').textContent = allFiles.length;
+                document.getElementById('visibleFiles').textContent = allFiles.length;
+                const latestDate = extractDate(allFiles[0].name);
                 document.getElementById('lastUpdate').textContent = latestDate;
 
-                // Generate file list HTML
-                let html = '';
-                pdfFiles.forEach((file, index) => {
-                    const date = extractDate(file.name);
-                    const downloadUrl = `${RAW_BASE}/${file.name}`;
-                    const isLatest = index === 0;
-                    
-                    html += `
-                        <div class="file-item">
-                            <div class="file-info">
-                                <div class="file-name">
-                                    📄 Forex Card Rates
-                                    ${isLatest ? '<span class="latest-badge">LATEST</span>' : ''}
-                                </div>
-                                <div class="file-date">Date: ${date}</div>
-                            </div>
-                            <a href="${downloadUrl}" class="download-btn" download>
-                                ⬇️ Download PDF
-                            </a>
-                        </div>
-                    `;
-                });
-
-                document.getElementById('fileList').innerHTML = html;
+                // Generate file list
+                displayFiles(allFiles);
             } catch (error) {
                 console.error('Error loading files:', error);
                 document.getElementById('fileList').innerHTML = '<p class="loading">Error loading files. Please try again later.</p>';
             }
+        }
+
+        function displayFiles(files) {
+            let html = '';
+            fileElements = [];
+            
+            files.forEach((file, index) => {
+                const date = extractDate(file.name);
+                const fullDate = extractFullDate(file.name);
+                const downloadUrl = `${RAW_BASE}/${file.name}`;
+                const isLatest = index === 0;
+                
+                html += `
+                    <div class="file-item" data-filename="${file.name.toLowerCase()}" data-date="${fullDate.toLowerCase()}">
+                        <div class="file-info">
+                            <div class="file-name">
+                                📄 Forex Card Rates
+                                ${isLatest ? '<span class="latest-badge">LATEST</span>' : ''}
+                            </div>
+                            <div class="file-date">Date: ${date}</div>
+                        </div>
+                        <a href="${downloadUrl}" class="download-btn" download>
+                            ⬇️ Download PDF
+                        </a>
+                    </div>
+                `;
+            });
+
+            document.getElementById('fileList').innerHTML = html;
+            fileElements = document.querySelectorAll('.file-item');
         }
 
         function extractDate(filename) {
@@ -245,21 +353,76 @@
             return 'Unknown';
         }
 
+        function extractFullDate(filename) {
+            const match = filename.match(/(\d{4}-\d{2}-\d{2})/);
+            if (match) {
+                const date = new Date(match[1]);
+                return date.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    weekday: 'long'
+                });
+            }
+            return '';
+        }
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const clearButton = document.getElementById('clearSearch');
+        const noResults = document.getElementById('noResults');
+
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            
+            // Show/hide clear button
+            if (searchTerm) {
+                clearButton.style.display = 'block';
+            } else {
+                clearButton.style.display = 'none';
+            }
+
+            // Filter files
+            let visibleCount = 0;
+            fileElements.forEach(element => {
+                const filename = element.getAttribute('data-filename');
+                const date = element.getAttribute('data-date');
+                
+                if (filename.includes(searchTerm) || date.includes(searchTerm)) {
+                    element.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    element.classList.add('hidden');
+                }
+            });
+
+            // Update visible count
+            document.getElementById('visibleFiles').textContent = visibleCount;
+
+            // Show/hide no results message
+            if (visibleCount === 0 && searchTerm) {
+                noResults.classList.add('show');
+            } else {
+                noResults.classList.remove('show');
+            }
+        });
+
+        // Clear search
+        clearButton.addEventListener('click', function() {
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input'));
+            searchInput.focus();
+        });
+
+        // Allow Enter key to work
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+
         // Load files when page loads
         loadFiles();
     </script>
 </body>
 </html>
-```
-
-3. **Commit the file**
-
-4. **Enable GitHub Pages:**
-   - Go to **Settings** → **Pages**
-   - Source: **"main"** branch
-   - Folder: **/ (root)**
-   - Click **Save**
-
-5. **Your public link will be:**
-```
-   https://iamlearninggpt.github.io/forex-card-downloader/
